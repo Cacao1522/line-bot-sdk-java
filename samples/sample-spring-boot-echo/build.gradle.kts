@@ -25,6 +25,6 @@ dependencies {
     implementation(project(":spring-boot:line-bot-spring-boot-handler"))
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
-
+    implementation("com.atilika.kuromoji:kuromoji-ipadic:0.9.0")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
