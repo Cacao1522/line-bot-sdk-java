@@ -14,7 +14,14 @@
  * under the License.
  */
 
+// repositories {
+//     mavenCentral()
+// }
+
+
+
 plugins {
+    // id("java")
     id("sdk.java-library")
     id("sdk.spring-boot")
 }
@@ -26,5 +33,14 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("com.atilika.kuromoji:kuromoji-ipadic:0.9.0")
+    implementation("org.jsoup:jsoup:1.13.1")
+    implementation("org.springframework.boot:spring-boot-starter")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.1")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.8.12")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
+
+// -Werror を無効化するための設定
+// tasks.withType(JavaCompile) {
+//     options.compilerArgs = options.compilerArgs.findAll { it != "-Werror" }
+// }

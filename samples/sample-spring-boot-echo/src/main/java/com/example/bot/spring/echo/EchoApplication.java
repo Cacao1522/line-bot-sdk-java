@@ -34,9 +34,12 @@ import java.io.*;
 import java.util.*;
 
 import javax.net.ssl.HttpsURLConnection;
-
 import java.net.*;
 
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 import com.atilika.kuromoji.ipadic.Token;
 import com.atilika.kuromoji.ipadic.Tokenizer;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -123,6 +126,7 @@ public class EchoApplication {
             List<String> ids = getWikidataPropIds(property);
             System.out.println(ids);
 
+            @SuppressWarnings("unchecked")
             List<Map<String, Object>> resList = (List<Map<String, Object>>) wdMap.get("result"); // 検索結果のリスト
             for (Map<String, Object> res : resList) { // 検索結果resを1つずつ取り出す
                 for (String prop : ids) {
@@ -138,41 +142,71 @@ public class EchoApplication {
                 for (int i = 1; i < ans.size(); i++) {
                     words += "、" + ans.get(i);
                 }
-                return entity + "の" + property + "は" + words + "ですよ";
-            } else
-                return "「" + userInput + "」ですか、へぇー";
-        } else {
-            // 雑学ネタ提供bot
-            entity = list1.get((int) Math.floor(Math.random() * list1.size()));
-            String wdJson = getWikidataJson(entity);
-            Map<String, Object> wdMap = json2Map(wdJson);
-            List<Map<String, Object>> resList = (List<Map<String, Object>>) wdMap.get("result"); // 検索結果のリスト
-            for (Map<String, Object> res : resList) { // 検索結果resを1つずつ取り出す
+                return entity + "の" + property + "は" + words + "ですよ。"+getWikipedia(entity,property);
+            } 
+        } 
+        // 雑学ネタ提供bot
+        entity = list1.get((int) Math.floor(Math.random() * list1.size()));
+        String property2 = "";
+        String wdJson = getWikidataJson(entity);
+        Map<String, Object> wdMap = json2Map(wdJson);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> resList = (List<Map<String, Object>>) wdMap.get("result"); // 検索結果のリスト
+        for (Map<String, Object> res : resList) { // 検索結果resを1つずつ取り出す
 
-                String entityID = getEntityID(res); // resのエンティティIDを取得
-                String prop = getProp(res);
-                System.out.println(prop);
-                List<String> propVals = getPropVals(res, prop); // プロパティ値の日本語ラベルリストを取得
-                System.out.println(getPropVals(res, prop));
-                property = getLabelById(prop); // プロパティの日本語ラベルを取得
-                System.out.println("エンティティ " + entityID + "のプロパティ" + prop + ": " + propVals);
-                ans.addAll(propVals);
+            String entityID = getEntityID(res); // resのエンティティIDを取得
+            String prop = getProp(res);
+            System.out.println(prop);
+            List<String> propVals = getPropVals(res, prop); // プロパティ値の日本語ラベルリストを取得
+            System.out.println(getPropVals(res, prop));
+            property2 = getLabelById(prop); // プロパティの日本語ラベルを取得
+            System.out.println("エンティティ " + entityID + "のプロパティ" + prop + ": " + propVals);
+            ans.addAll(propVals);
 
-                break;
-            }
-            if (ans.size() > 0) {
+            break;
+        } 
+        if (ans.size() > 0) {
                 String words = ans.get(0);
-                for (int i = 1; i < ans.size(); i++) {
-                    words += "、" + ans.get(i);
-                }
-                return "わかりません。" + entity + "といえば、" + entity + "の" + property + "は" + words + "ですよ";
-            } else
-                return "「" + userInput + "」ですか、へぇー";
-
-        }
-
-        // return "「" + userInput + "」ですか、へぇー";
+            for (int i = 1; i < ans.size(); i++) {
+                words += "、" + ans.get(i);
+            }
+            String wiki1 = property.length()>0 ? getWikipedia(entity,property) : "わかりません。";
+            return wiki1 + entity+"といえば、"+ entity+"の" +property2 +"は"+ words+ "ですよ。"+getWikipedia(entity,property2);
+        } else
+            return "「" + userInput + "」ですか、へぇー。"+getWikipedia(entity,property2);
+        
     }
+
+    /**
+	 * wikipediaの情報を返す
+	 *
+	 * @param entity, property
+	 * @return wikipediaの情報
+	 * @throws IOException
+	 */
+	public static String getWikipedia(String entity, String property){
+		// Wikipedia
+		Document document = null;
+		try {
+			document = Jsoup.connect("https://ja.wikipedia.org/wiki/"+entity).get();
+		} catch (IOException e) {
+			// TODO 自動生成された catch ブロック
+			return "";
+		}
+		Element mainContent = document.select("main#content").first();
+		Elements paragraphs = mainContent.select("p, dd, li");
+		String content = "";
+		for (Element paragraph : paragraphs) {
+			content += (paragraph.text());
+			String[] sens = content.split("。");
+			for (String sen : sens) {
+				if (sen.contains(property)) {
+					return sen+"。";
+				}
+			}
+		}
+		return "";
+	}
 
     /**
      * resのエンティティIDを返す
@@ -181,7 +215,10 @@ public class EchoApplication {
      * @return resのエンティティID
      */
     public static String getEntityID(Map<String, Object> res) {
-        return (String) ((Map) res.get("entities")).keySet().iterator().next();
+        
+        @SuppressWarnings("unchecked")
+        String id = ((Map<String, Object>) res.get("entities")).keySet().iterator().next();
+        return id;
     }
 
     /**
@@ -194,18 +231,23 @@ public class EchoApplication {
     public static List<String> getPropVals(Map<String, Object> res, String prop) {
         List<String> vals = new ArrayList<String>();
         String entityID = getEntityID(res);
-        Map entityMap = (Map) ((Map) res.get("entities")).get(entityID);
-        Map claimMap = (Map) entityMap.get("claims");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> entityMap = (Map<String, Object>) ((Map<String, Object>) res.get("entities")).get(entityID);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> claimMap = (Map<String, Object>) entityMap.get("claims");
         if (claimMap != null) {
-            List<Map> propList = (List<Map>) claimMap.get(prop);
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> propList = (List<Map<String, Object>>) claimMap.get(prop);
             if (propList != null) {
-                for (Map propMap : propList) {
-                    Map<String, Object> valMap = (Map) ((Map) propMap.get("mainsnak")).get("datavalue");
+                for (Map<String, Object> propMap : propList) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> valMap = (Map<String, Object>) ((Map<String, Object>) propMap.get("mainsnak")).get("datavalue");
                     Object val = valMap.get("value");
                     if (val instanceof String) { // valがString型なら
                         vals.add((String) val);
-                    } else if (val instanceof Map) { // valがMap型なら
-                        Map map = (Map) val;
+                    } else if (val instanceof Map<?, ?>) { // valがMap<String, Object>型なら
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> map = (Map<String, Object>) val;
                         String id = (String) map.get("id");
                         String am = (String) map.get("amount");
                         if (id != null) {
@@ -227,8 +269,10 @@ public class EchoApplication {
     public static String getProp(Map<String, Object> res) {
         List<String> vals = new ArrayList<String>();
         String entityID = getEntityID(res);
-        Map entityMap = (Map) ((Map) res.get("entities")).get(entityID);
-        Map claimMap = (Map) entityMap.get("claims");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> entityMap = (Map<String, Object>) ((Map<String, Object>) res.get("entities")).get(entityID);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> claimMap = (Map<String, Object>) entityMap.get("claims");
         boolean isMap = false;
         if (claimMap != null) {
             List<String> list = new ArrayList<String>(claimMap.keySet());
@@ -236,10 +280,12 @@ public class EchoApplication {
             while (!isMap) { // val == nullをはじく
                 int index = new Random().nextInt(list.size());
                 prop = list.get(index);
-                List<Map> propList = (List<Map>) claimMap.get(prop);
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> propList = (List<Map<String, Object>>) claimMap.get(prop);
                 if (propList != null) {
-                    for (Map propMap : propList) {
-                        Map<String, Object> valMap = (Map) ((Map) propMap.get("mainsnak")).get("datavalue");
+                    for (Map<String, Object> propMap : propList) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> valMap = (Map<String, Object>) ((Map<String, Object>) propMap.get("mainsnak")).get("datavalue");
                         Object val = valMap.get("value");
                         System.out.println(val);
                         if (val != null)
@@ -256,16 +302,21 @@ public class EchoApplication {
     private static String getLabelById(String id) {
         String wdJson = getWikidataJson(id);
         Map<String, Object> wdMap = json2Map(wdJson);
+        @SuppressWarnings("unchecked")
         List<Map<String, Object>> resultList = (List<Map<String, Object>>) wdMap.get("result");
         Map<String, Object> resultMap = resultList.get(0);
-        Map entityMap = (Map) ((Map) resultMap.get("entities")).get(id);
-        Map labelMap = (Map) entityMap.get("labels");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> entityMap = (Map<String, Object>) ((Map<String, Object>) resultMap.get("entities")).get(id);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> labelMap = (Map<String, Object>) entityMap.get("labels");
         if (labelMap.containsKey("ja")) {
-            Map jaMap = (Map) labelMap.get("ja");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> jaMap = (Map<String, Object>) labelMap.get("ja");
             Object val = (jaMap.get("value"));
             return (String) val;
         } else {
-            Map enMap = (Map) labelMap.get("en");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> enMap = (Map<String, Object>) labelMap.get("en");
             Object val = (enMap.get("value"));
             return (String) val;
         }
@@ -314,6 +365,7 @@ public class EchoApplication {
         String url = "https://www.wikidata.org/w/api.php?action=wbsearchentities&language=ja&format=json&search="
                 + encodedQuery;
         Map<String, Object> map = json2Map(getData(url));
+        @SuppressWarnings("unchecked")
         List<Map<String, Object>> list = (List<Map<String, Object>>) map.get("search");
         List<String> ids = new ArrayList<String>();
         for (Map<String, Object> entMap : list) {
@@ -340,6 +392,7 @@ public class EchoApplication {
                 + encodedQuery;
 
         Map<String, Object> map = json2Map(getData(url));
+        @SuppressWarnings("unchecked")
         List<Map<String, Object>> list = (List<Map<String, Object>>) map.get("search");
         List<String> ids = new ArrayList<String>();
         for (Map<String, Object> entMap : list) {
